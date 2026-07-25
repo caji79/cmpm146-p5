@@ -342,11 +342,44 @@ class Individual_DE(object):
 
 Individual = Individual_Grid
 
+def tournament_select(population):
+    sample = random.sample(population, 10)
+    winner = max(sample, key=lambda individual: individual.fitness())
+    return winner
+
+def elites_select(population, count):
+    sorted_population = sorted(population, key=lambda individual: individual.fitness(), reverse=True) #reverse so better ones at the end
+    return sorted_population[:count]
+
+def roulette_select(population):
+    fitnesses = [individual.fitness() for individual in population]
+    minimum = min(fitnesses) - 0.01 # shift to avoid individual with minimum fitness get weight of 0
+    weights = []
+    for fitness in fitnesses:
+        weight = (fitness - minimum)
+        weights.append(weight)
+    return random.choices(population, weights=weights, k=1)[0]
 
 def generate_successors(population):
     results = []
     # STUDENT Design and implement this
     # Hint: Call generate_children() on some individuals and fill up results.
+    limit_size = len(population)
+
+    results = elites_select(population, 20) # can always change the count
+
+    while len(results) < limit_size:
+        # parent A -> strategy
+        parentA = tournament_select(population)
+        # parent B -> strategy
+        parentB = tournament_select(population)
+
+        children = parentA.generate_children(parentB)
+
+        for child in children:
+            while len(results) <= limit_size:
+                results.append(child)
+
     return results
 
 
