@@ -69,7 +69,6 @@ class Individual_Grid(object):
         # STUDENT implement a mutation operator, also consider not mutating this individual
         # STUDENT also consider weighting the different tile types so it's not uniformly random
         # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
-
         left = 1
         right = width - 1
         mutation_rate = 0.001
@@ -78,6 +77,9 @@ class Individual_Grid(object):
 
         for y in range(height - 1):
             for x in range(left, right):
+                if genome[y][x] in ("T", "|"):
+                    continue
+                
                 if random.random() < mutation_rate:
                     old_tile = genome[y][x]
 
@@ -100,45 +102,28 @@ class Individual_Grid(object):
 
         return genome
 
-    '''
     # Create zero or more children from self and other
     def generate_children(self, other):
         new_genome1 = copy.deepcopy(self.genome)
         new_genome2 = copy.deepcopy(other.genome)
         # Leaving first and last columns alone...
         # do crossover with other
+
         left = 1
         right = width - 1
+        crossover_point = random.randint(left, right - 1)
+
         for x in range(left, right):
-            if random.random() < 0.5:
+            # if random.random() < 0.5:
+            if x >= crossover_point:
                 for y in range(height):
                     new_genome1[y][x] = other.genome[y][x]
                     new_genome2[y][x] = self.genome[y][x]
+
         # do mutation; note we're returning a one-element tuple here
         new_genome1 = self.mutate(new_genome1)
         new_genome2 = self.mutate(new_genome2)
         return (Individual_Grid(new_genome1), Individual_Grid(new_genome2))
-    '''
-
-    def generate_children(self, other):
-            new_genome1 = copy.deepcopy(self.genome)
-            new_genome2 = copy.deepcopy(other.genome)
-            # Leaving first and last columns alone...
-            # do crossover with other
-            left = 1
-            right = width - 1
-            crossover_point = random.randint(left, right - 1)
-
-            for x in range(left, right):
-                if x >= crossover_point:
-                    for y in range(height):
-                        new_genome1[y][x] = other.genome[y][x]
-                        new_genome2[y][x] = self.genome[y][x]
-                        
-            # do mutation; note we're returning a one-element tuple here
-            new_genome1 = self.mutate(new_genome1)
-            new_genome2 = self.mutate(new_genome2)
-            return (Individual_Grid(new_genome1), Individual_Grid(new_genome2))
 
     # Turn the genome into a level string (easy for this genome)
     def to_level(self):
