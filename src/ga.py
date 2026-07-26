@@ -141,7 +141,7 @@ class Individual_Grid(object):
         # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
         # STUDENT also consider weighting the different tile types so it's not uniformly random
         weights = [
-            50,  # empty space
+            100,  # empty space
             30,  # solid wall
             10,  # question mark block with a coin
             10,  # question mark block with a mushroom
@@ -156,22 +156,19 @@ class Individual_Grid(object):
         for x in range(0, width - 1):
             for y in range(height - 2, -1, -1):
                 if g[y][x] == "T" and (y > (height - 5)):
-                    top_y = y
-                    for y in range(top_y + 1, height - 1):
-                        g[y][x] = "|"
+                    for pipe_y in range(y + 1, height - 1):
+                        g[pipe_y][x] = "|"
                 elif ((g[y][x] == "T" and (y <= height - 5)) 
-                      or (g[y][x] == "|" and (g[y + 1][x] != "|" 
-                                              or g[y + 1][x] != "X")
-                                              or g[y - 1][x] != "T")):
+                      or (g[y][x] == "|" and (g[y + 1][x] not in ("|", "X")))
+                      or not any(g[above][x] == "T" for above in range(y))):
                         g[y][x] = "-"
 
         for x in range(0, width):
             for y in range(height - 2, -1, -1):
-                if g[y][x] == "X" and (y > (height - 5)):
-                    top_y = y
-                    for y in range(top_y + 1, height - 1):
-                        g[y][x] = "X"
-                elif ((g[y][x] == "X" and (y <= height - 5))):
+                if g[y][x] == "X" and (y > (height - 6)):
+                    for pipe_y in range(y + 1, height - 1):
+                        g[pipe_y][x] = "X"
+                elif (g[y][x] == "X" and (y <= height - 6)):
                         g[y][x] = "-"
 
         for x in g:
