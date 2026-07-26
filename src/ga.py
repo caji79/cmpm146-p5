@@ -117,7 +117,18 @@ class Individual_Grid(object):
     def random_individual(cls):
         # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
         # STUDENT also consider weighting the different tile types so it's not uniformly random
-        g = [random.choices(options, k=width) for row in range(height)]
+        weights = [
+            50,  # empty space
+            10,  # solid wall
+            10,  # question mark block with a coin
+            10,  # question mark block with a mushroom
+            20,  # breakable block
+            20,  # coin
+            5,  # pipe segment
+            5,  # pipe top
+            10,  # enemy
+        ]
+        g = [random.choices(options, weights=weights, k=width) for row in range(height)]
 
         for x in range(0, width - 1):
             for y in range(height - 2, -1, -1):
@@ -133,8 +144,13 @@ class Individual_Grid(object):
 
         for x in range(0, width):
             for y in range(height - 2, -1, -1):
-                if (g[y][x] == "X") and (g[y + 1][x] != "X"):
-                    g[y][x] = "-"
+                if g[y][x] == "X" and (y > (height - 5)):
+                    top_y = y
+                    for y in range(top_y + 1, height - 1):
+                        g[y][x] = "X"
+                elif ((g[y][x] == "X" and (y <= height - 5)) 
+                      or (g[y][x] == "X" and (g[y + 1][x] != "X"))):
+                        g[y][x] = "-"
 
         for x in g:
             x[0] = "-"
@@ -143,8 +159,10 @@ class Individual_Grid(object):
         g[15][:] = ["X"] * width
         g[14][0] = "m"
         g[7][-1] = "v"
-        g[8:14][-1] = ["f"] * 6
-        g[14:16][-1] = ["X", "X"]
+        for y in range(8, 14):
+            g[y][-1] = "f"
+        for y in range(14, 16):
+            g[y][-1] = "X"
         return cls(g)
 
 
