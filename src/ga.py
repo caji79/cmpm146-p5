@@ -72,9 +72,32 @@ class Individual_Grid(object):
 
         left = 1
         right = width - 1
-        for y in range(height):
+        mutation_rate = 0.001
+        mutation_tiles = ["-", "X", "?", "M", "B", "o", "E"]
+        mutation_weights = [70, 10, 5, 1, 5, 7, 2]
+
+        for y in range(height - 1):
             for x in range(left, right):
-                pass
+                if random.random() < mutation_rate:
+                    old_tile = genome[y][x]
+
+                    # randomly pick one of the mutation tiles and replace the old one
+                    new_tile = random.choices(
+                        mutation_tiles,
+                        weights=mutation_weights,
+                        k=1
+                    )[0]
+
+                    # prevent picking the same type of tile
+                    while new_tile == old_tile:
+                        new_tile = random.choices(
+                            mutation_tiles,
+                            weights=mutation_weights,
+                            k=1
+                        )[0]
+
+                    genome[y][x] = new_tile
+
         return genome
 
     # Create zero or more children from self and other
@@ -119,7 +142,7 @@ class Individual_Grid(object):
         # STUDENT also consider weighting the different tile types so it's not uniformly random
         weights = [
             50,  # empty space
-            10,  # solid wall
+            30,  # solid wall
             10,  # question mark block with a coin
             10,  # question mark block with a mushroom
             20,  # breakable block
@@ -148,8 +171,7 @@ class Individual_Grid(object):
                     top_y = y
                     for y in range(top_y + 1, height - 1):
                         g[y][x] = "X"
-                elif ((g[y][x] == "X" and (y <= height - 5)) 
-                      or (g[y][x] == "X" and (g[y + 1][x] != "X"))):
+                elif ((g[y][x] == "X" and (y <= height - 5))):
                         g[y][x] = "-"
 
         for x in g:
