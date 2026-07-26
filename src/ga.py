@@ -11,6 +11,8 @@ import math
 width = 200
 height = 16
 
+SELECTION_METHOD = "tournament"  # or "roulette"
+
 options = [
     "-",  # an empty space
     "X",  # a solid wall
@@ -77,18 +79,21 @@ class Individual_Grid(object):
 
     # Create zero or more children from self and other
     def generate_children(self, other):
-        new_genome = copy.deepcopy(self.genome)
+        new_genome1 = copy.deepcopy(self.genome)
+        new_genome2 = copy.deepcopy(self.genome)
         # Leaving first and last columns alone...
         # do crossover with other
         left = 1
         right = width - 1
-        for y in range(height):
-            for x in range(left, right):
-                # STUDENT Which one should you take?  Self, or other?  Why?
-                # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
-                pass
+        for x in range(left, right):
+            if random.random() < 0.5:
+                for y in range(height):
+                    new_genome1[y][x] = other.genome[y][x]
+                    new_genome2[y][x] = self.genome[y][x]
         # do mutation; note we're returning a one-element tuple here
-        return (Individual_Grid(new_genome),)
+        new_genome1 = self.mutate(new_genome1)
+        new_genome2 = self.mutate(new_genome2)
+        return (Individual_Grid(new_genome1), Individual_Grid(new_genome2))
 
     # Turn the genome into a level string (easy for this genome)
     def to_level(self):
@@ -113,6 +118,24 @@ class Individual_Grid(object):
         # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
         # STUDENT also consider weighting the different tile types so it's not uniformly random
         g = [random.choices(options, k=width) for row in range(height)]
+
+        for x in range(1, width - 1):
+            for y in range(height - 2, -1, -1):
+                if g[y][x] == "T" and (y > (height - 5)):
+                    top_y = y
+                    for y in range(top_y + 1, height - 1):
+                        g[y][x] = "|"
+                elif ((g[y][x] == "T" and (y <= height - 5)) 
+                      or (g[y][x] == "|" and (g[y + 1][x] != "|" 
+                                              or g[y + 1][x] != "X")
+                                              or g[y - 1][x] != "T")):
+                        g[y][x] = "-"
+
+        for x in range(1, width - 1):
+            for y in range(height - 2, -1, -1):
+                if (g[y][x] == "X") and (g[y + 1][x] != "X"):
+                    g[y][x] = "-"
+
         g[15][:] = ["X"] * width
         g[14][0] = "m"
         g[7][-1] = "v"
@@ -348,7 +371,7 @@ def tournament_select(population):
     return winner
 
 def elites_select(population, count):
-    sorted_population = sorted(population, key=lambda individual: individual.fitness(), reverse=True) #reverse so better ones at the end
+    sorted_population = sorted(population, key=lambda individual: individual.fitness(), reverse=True) #reverse so better ones at front
     return sorted_population[:count]
 
 def roulette_select(population):
@@ -369,10 +392,14 @@ def generate_successors(population):
     results = elites_select(population, 20) # can always change the count
 
     while len(results) < limit_size:
-        # parent A -> strategy
-        parentA = tournament_select(population)
-        # parent B -> strategy
-        parentB = tournament_select(population)
+        if SELECTION_METHOD == "tournament":
+            # parent A -> strategy
+            parentA = tournament_select(population)
+            # parent B -> strategy
+            parentB = tournament_select(population)
+        else:
+            parentA = roulette_select(population)
+            parentB = roulette_select(population)
 
         children = parentA.generate_children(parentB)
 
