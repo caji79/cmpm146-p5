@@ -80,7 +80,7 @@ class Individual_Grid(object):
     # Create zero or more children from self and other
     def generate_children(self, other):
         new_genome1 = copy.deepcopy(self.genome)
-        new_genome2 = copy.deepcopy(self.genome)
+        new_genome2 = copy.deepcopy(other.genome)
         # Leaving first and last columns alone...
         # do crossover with other
         left = 1
@@ -119,7 +119,7 @@ class Individual_Grid(object):
         # STUDENT also consider weighting the different tile types so it's not uniformly random
         g = [random.choices(options, k=width) for row in range(height)]
 
-        for x in range(1, width - 1):
+        for x in range(0, width - 1):
             for y in range(height - 2, -1, -1):
                 if g[y][x] == "T" and (y > (height - 5)):
                     top_y = y
@@ -131,10 +131,14 @@ class Individual_Grid(object):
                                               or g[y - 1][x] != "T")):
                         g[y][x] = "-"
 
-        for x in range(1, width - 1):
+        for x in range(0, width):
             for y in range(height - 2, -1, -1):
                 if (g[y][x] == "X") and (g[y + 1][x] != "X"):
                     g[y][x] = "-"
+
+        for x in g:
+            x[0] = "-"
+            x[-1] = "-"
 
         g[15][:] = ["X"] * width
         g[14][0] = "m"
@@ -404,8 +408,9 @@ def generate_successors(population):
         children = parentA.generate_children(parentB)
 
         for child in children:
-            while len(results) <= limit_size:
-                results.append(child)
+            if len(results) >= limit_size:
+                break
+            results.append(child)
 
     return results
 
