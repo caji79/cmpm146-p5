@@ -56,6 +56,19 @@ class Individual_Grid(object):
         )
         self._fitness = sum(map(lambda m: coefficients[m] * measurements[m],
                                 coefficients))
+        # Bonus for decoration variety
+        if measurements.get("decorationPercentage", 0) > 0.02:
+            self._fitness += 0.3
+        # Penalty for too easy or too hard
+        leniency = measurements.get("leniency", 0)
+        if leniency > 15:
+            self._fitness -= 0.3
+        if leniency < -5:
+            self._fitness -= 0.3
+        # Bonus for meaningful jumps
+        mj = measurements.get("meaningfulJumps", 0)
+        if mj > 0:
+            self._fitness += min(mj * 0.1, 0.5)
         return self
 
     # Return the cached fitness value or calculate it as needed.
@@ -73,7 +86,7 @@ class Individual_Grid(object):
         right = width - 1
         mutation_rate = 0.001
         mutation_tiles = ["-", "X", "?", "M", "B", "o", "E"]
-        mutation_weights = [70, 10, 5, 1, 5, 7, 2]
+        mutation_weights = [60, 12, 5, 2, 8, 8, 5]
 
         for y in range(height - 1):
             for x in range(left, right):
@@ -98,7 +111,26 @@ class Individual_Grid(object):
                             k=1
                         )[0]
 
+                    # Enemies should only be on ground level or on platforms
+                    if new_tile == "E":
+                        if y < height - 2:
+                            # Check if there's ground below
+                            if genome[y + 1][x] not in ("X", "B", "?", "M"):
+                                new_tile = "-"
+                    # Blocks shouldn't be on the very bottom or very top
+                    if new_tile in ("X", "B", "?", "M"):
+                        if y >= height - 2 or y <= 1:
+                            new_tile = "-"
+
                     genome[y][x] = new_tile
+
+        # Occasionally add a gap
+        if random.random() < 0.03:
+            gx = random.randint(10, width - 15)
+            gw = random.randint(2, 4)
+            for i in range(gw):
+                if gx + i < right:
+                    genome[height - 1][gx + i] = "-"
 
         return genome
 
