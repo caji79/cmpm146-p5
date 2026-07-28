@@ -94,6 +94,7 @@ class Individual_Grid(object):
 
         for y in range(height - 1):
             for x in range(left, right):
+                # don't mutate pipe body and head
                 if genome[y][x] in ("T", "|"):
                     continue
 
@@ -296,9 +297,18 @@ class Individual_Grid(object):
                     new_genome1[y][x] = other.genome[y][x]
                     new_genome2[y][x] = self.genome[y][x]
 
-        # do mutation; note we're returning a one-element tuple here
+        # do mutation
         new_genome1 = self.mutate(new_genome1)
         new_genome2 = self.mutate(new_genome2)
+
+        for genome in (new_genome1, new_genome2):
+            for x in range(1, width - 1):
+                for y in range(height - 1):
+                    if genome[y][x] == "|":
+                        if (genome[y + 1][x] not in ("|", "X")
+                            or not any(genome[above][x] == "T" for above in range(y))):
+                            genome[y][x] = "-"
+
         return (Individual_Grid(new_genome1), Individual_Grid(new_genome2))
 
     # Turn the genome into a level string (easy for this genome)
@@ -597,8 +607,8 @@ class Individual_DE(object):
 
     def generate_children(self, other):
         # STUDENT How does this work?  Explain it in your writeup.
-        pa = random.randint(0, len(self.genome) - 1)
-        pb = random.randint(0, len(other.genome) - 1)
+        pa = random.randint(0, len(self.genome) - 1) if len(self.genome) > 0 else 0  # if len(self.genome) > 0 else 0 added to fix bug
+        pb = random.randint(0, len(other.genome) - 1) if len(other.genome) > 0 else 0  # if len(other.genome) > 0 else 0 added to fix bug
         a_part = self.genome[:pa] if len(self.genome) > 0 else []
         b_part = other.genome[pb:] if len(other.genome) > 0 else []
         ga = a_part + b_part
@@ -676,7 +686,7 @@ class Individual_DE(object):
         return Individual_DE(g)
 
 
-Individual = Individual_Grid
+Individual = Individual_DE
 
 def tournament_select(population):
     sample = random.sample(population, 10)
@@ -720,6 +730,8 @@ def generate_successors(population):
             if len(results) >= limit_size:
                 break
             results.append(child)
+
+    print("Population:", len(population), "->", len(results))
 
     return results
 
