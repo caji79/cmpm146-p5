@@ -511,13 +511,48 @@ class Individual_DE(object):
             linearity=-0.5,
             solvability=2.0
         )
+
+        # count the number of design elements in a level
+        counts = {}
+        for de in self.genome:
+            de_type = de[1]
+            counts[de_type] = counts.get(de_type, 0) + 1
+
         penalties = 0
+        bonuses = 0
+
+        stairs_count = counts.get("6_stairs", 0)
+        hole_count = counts.get("0_hole", 0)
+        platform_count = counts.get("1_platform", 0)
+        coin_count = counts.get("3_coin", 0)
+        qblock_count = counts.get("5_qblock", 0)
+
         # STUDENT For example, too many stairs are unaesthetic.  Let's penalize that
-        if len(list(filter(lambda de: de[1] == "6_stairs", self.genome))) > 5:
+        # penalize excessive stairs and holes
+        if stairs_count > 6:
+            penalties -= (stairs_count - 6) * 0.5
+
+        if hole_count > 8:
+            penalties -= (hole_count - 8) * 0.5
+
+        if platform_count == 0:
             penalties -= 2
+
+        # Reward a moderate number of coins.
+        if 5 <= coin_count <= 20:
+            bonuses += 1.2
+        elif coin_count > 20:
+            penalties -= (coin_count - 20) * 0.1
+
+        # Reward a moderate number of question blocks.
+        if 5 <= qblock_count <= 15:
+            bonuses += 1
+        elif qblock_count > 15:
+            penalties -= (qblock_count - 15) * 0.1
+
         # STUDENT If you go for the FI-2POP extra credit, you can put constraint calculation in here too and cache it in a new entry in __slots__.
         self._fitness = sum(map(lambda m: coefficients[m] * measurements[m],
-                                coefficients)) + penalties
+                                coefficients)) + penalties + bonuses
         return self
 
     def fitness(self):
