@@ -90,7 +90,7 @@ class Individual_Grid(object):
         right = width - 1
         mutation_rate = 0.001
         mutation_tiles = ["-", "X", "?", "M", "B", "o", "E"]
-        mutation_weights = [120, 10, 4, 2, 3, 6, 4]
+        mutation_weights = [120, 10, 4, 2, 2, 6, 4]
 
         for y in range(height - 1):
             for x in range(left, right):
@@ -263,6 +263,13 @@ class Individual_Grid(object):
                     if not has_support:
                         genome[y][x] = "-"
 
+         # enemies should be on ground or on a solid surface
+        for x in range(1, width - 1):
+            for y in range(height - 2):
+                if genome[y][x] == "E":
+                    if y + 1 >= height or genome[y + 1][x] not in ("X", "B", "?", "M", "|", "T"):
+                        genome[y][x] = "-"
+
         # no block directly above a pipe top 
         for x in range(1, width - 1):
             for y in range(1, height - 1):
@@ -300,6 +307,14 @@ class Individual_Grid(object):
         # do mutation
         new_genome1 = self.mutate(new_genome1)
         new_genome2 = self.mutate(new_genome2)
+
+        for genome in (new_genome1, new_genome2):
+            for x in range(1, width - 1):
+                for y in range(height - 1):
+                    if genome[y][x] == "|":
+                        if (genome[y + 1][x] not in ("|", "X")
+                            or not any(genome[above][x] == "T" for above in range(y))):
+                            genome[y][x] = "-"
 
         return (Individual_Grid(new_genome1), Individual_Grid(new_genome2))
 
@@ -713,7 +728,7 @@ class Individual_DE(object):
         return Individual_DE(g)
 
 
-Individual = Individual_DE
+Individual = Individual_Grid
 
 def tournament_select(population):
     sample = random.sample(population, 10)
