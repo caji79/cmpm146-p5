@@ -57,8 +57,9 @@ class Individual_Grid(object):
         self._fitness = sum(map(lambda m: coefficients[m] * measurements[m],
                                 coefficients))
         # Bonus for decoration variety
-        if measurements.get("decorationPercentage", 0) > 0.02:
-            self._fitness += 0.3
+        dec = measurements.get("decorationPercentage", 0)
+        if dec > 0.01:
+            self._fitness += min(dec * 5.0, 0.5)
         # Penalty for too easy or too hard
         leniency = measurements.get("leniency", 0)
         if leniency > 15:
@@ -69,6 +70,9 @@ class Individual_Grid(object):
         mj = measurements.get("meaningfulJumps", 0)
         if mj > 0:
             self._fitness += min(mj * 0.1, 0.5)
+        jumps = measurements.get("jumps", 0)
+        if jumps > 2:
+            self._fitness += min(jumps * 0.02, 0.3)
         return self
 
     # Return the cached fitness value or calculate it as needed.
@@ -86,11 +90,18 @@ class Individual_Grid(object):
         right = width - 1
         mutation_rate = 0.001
         mutation_tiles = ["-", "X", "?", "M", "B", "o", "E"]
-        mutation_weights = [60, 12, 5, 2, 8, 8, 5]
+        mutation_weights = [120, 10, 4, 2, 3, 6, 4]
 
         for y in range(height - 1):
             for x in range(left, right):
                 if genome[y][x] in ("T", "|"):
+                    continue
+
+                # Don't mutate the starting area
+                if x < 5:
+                    continue
+                # Don't mutate near the flag
+                if x >= width - 5:
                     continue
                 
                 if random.random() < mutation_rate:
@@ -131,6 +142,139 @@ class Individual_Grid(object):
             for i in range(gw):
                 if gx + i < right:
                     genome[height - 1][gx + i] = "-"
+
+        # If an X block is near an existing wall, build a stair stepping up/down
+        if random.random() < 0.04:
+            sx = random.randint(5, width - 10)
+            sh = random.randint(2, 5)
+            direction = random.choice([-1, 1])
+            for step in range(sh):
+                col = sx + step * direction
+                if col < 1 or col >= right:
+                    break
+                step_height = step + 1
+                for fill_y in range(height - 2, height - 2 - step_height, -1):
+                    if fill_y >= 4:
+                        genome[fill_y][col] = "X"
+
+        # Constraints
+        # cap gap widths to 4 so they stay jumpable
+        gap_count = 0
+        for x in range(1, width - 1):
+            if genome[height - 1][x] == "-":
+                gap_count += 1
+                if gap_count > 4:
+                    genome[height - 1][x] = "X"
+            else:
+                gap_count = 0
+
+        # clear walls/pipes above gaps
+        for x in range(1, width - 1):
+            if genome[height - 1][x] == "-":
+                for y in range(height - 2, -1, -1):
+                    if genome[y][x] in ("X", "|", "T"):
+                        genome[y][x] = "-"
+
+
+        # fix floating X walls
+        # For each column, find floating X (not connected to ground).
+        # If the floating X wall would be height <= 4 when grounded, fill it to ground; if it can form a staircase with neighboring grounded wall, fill it to ground; otherwise, remove the top X tiles from the floating wall
+        for x in range(1, width - 1):
+            if genome[height - 1][x] != "X":
+                continue  # \gaps already handled
+            # Find grounded wall height
+            grounded_top = height - 1
+            for y in range(height - 2, -1, -1):
+                if genome[y][x] == "X":
+                    grounded_top = y
+                else:
+                    break
+            # find floating X above ground
+            floating_xs = []
+            for y in range(grounded_top - 1, -1, -1):
+                if genome[y][x] == "X":
+                    floating_xs.append(y)
+            if not floating_xs:
+                continue
+            # highest floating X
+            highest_floating = min(floating_xs)
+            # height if fill from highest floating X down to ground
+            total_height = (height - 2) - highest_floating + 1
+            # neighbor wall heights for staircase check
+            can_stair = False
+            for nx in [x - 1, x + 1]:
+                if 0 <= nx < width and genome[height - 1][nx] == "X":
+                    nh = 0
+                    for ny in range(height - 2, -1, -1):
+                        if genome[ny][nx] == "X":
+                            nh += 1
+                        else:
+                            break
+                    if nh > 0 and abs(total_height - nh) <= 2:
+                        can_stair = True
+
+            if total_height <= 4 or can_stair:
+                # Fill from highest floating X down to ground
+                for fill_y in range(highest_floating, height - 1):
+                    genome[fill_y][x] = "X"
+            else:
+                # Remove the floating X
+                for y in floating_xs:
+                    genome[y][x] = "-"
+
+        # break up vertical stacks of B
+        for x in range(1, width - 1):
+            b_count = 0
+            for y in range(height - 2, -1, -1):
+                if genome[y][x] == "B":
+                    b_count += 1
+                    if b_count >= 2:
+                        genome[y][x] = "-"
+                else:
+                    b_count = 0
+
+        # clear top 4 rows
+        for y in range(4):
+            for x in range(width):
+                genome[y][x] = "-"
+
+        # M and ? must be reachable  (4 spaces below must be solid)
+        for x in range(1, width - 1):
+            for y in range(4, height - 2):
+                if genome[y][x] in ("M", "?"):
+                    has_support = False
+                    for dy in range(1, 5):
+                        if y + dy < height and genome[y + dy][x] in ("X", "B", "?", "M"):
+                            has_support = True
+                            break
+                    if not has_support:
+                        genome[y][x] = "-"
+
+        # coins must be reachable (2 spaces below must be solid)
+        for x in range(1, width - 1):
+            for y in range(4, height - 2):
+                if genome[y][x] == "o":
+                    has_support = False
+                    for dy in range(1, 3):
+                        if y + dy < height and genome[y + dy][x] in ("X", "B", "?", "M"):
+                            has_support = True
+                            break
+                    if not has_support:
+                        genome[y][x] = "-"
+
+        # no block directly above a pipe top 
+        for x in range(1, width - 1):
+            for y in range(1, height - 1):
+                if genome[y][x] == "T" and y - 1 >= 0:
+                    if genome[y - 1][x] != "-":
+                        genome[y - 1][x] = "-"        
+
+        # block directly below ?, B, M must be air
+        for x in range(1, width - 1):
+            for y in range(4, height - 2):
+                if genome[y][x] in ("?", "B", "M"):
+                    if y + 1 < height - 1 and genome[y + 1][x] in ("?", "B", "M", "X"):
+                        genome[y + 1][x] = "-"
 
         return genome
 
@@ -192,16 +336,18 @@ class Individual_Grid(object):
         ]
         g = [random.choices(options, weights=weights, k=width) for row in range(height)]
 
+        # pipe tops need pipe segments below, remove floating pipes, .max height of 4
         for x in range(0, width - 1):
             for y in range(height - 2, -1, -1):
                 if g[y][x] == "T" and (y > (height - 5)):
                     for pipe_y in range(y + 1, height - 1):
                         g[pipe_y][x] = "|"
                 elif ((g[y][x] == "T" and (y <= height - 5)) 
-                      or (g[y][x] == "|" and (g[y + 1][x] not in ("|", "X")))
+                      or (g[y][x] == "|" and (g[y + 1][x] not in ("|", "X")) and (g[y - 1][x] not in ("|", "T")))
                       or not any(g[above][x] == "T" for above in range(y))):
                         g[y][x] = "-"
 
+        # forming a solid wall within height of 4
         for x in range(0, width):
             for y in range(height - 2, -1, -1):
                 if g[y][x] == "X" and (y > (height - 6)):
@@ -209,6 +355,93 @@ class Individual_Grid(object):
                         g[pipe_y][x] = "X"
                 elif (g[y][x] == "X" and (y <= height - 6)):
                         g[y][x] = "-"
+
+        # Constraint
+        # no block directly above a pipe top
+        for x in range(1, width - 1):
+            for y in range(1, height - 1):
+                if g[y][x] == "T" and y - 1 >= 0:
+                    if g[y - 1][x] != "-":
+                        g[y - 1][x] = "-"
+
+        # enemies should be on ground or on a solid surface
+        for x in range(1, width - 1):
+            for y in range(height - 2):
+                if g[y][x] == "E":
+                    if y + 1 >= height or g[y + 1][x] not in ("X", "B", "?", "M", "|", "T"):
+                        g[y][x] = "-"
+
+        #question blocks shouldn't be on the ground floor row
+        for x in range(1, width - 1):
+            if g[height - 2][x] in ("?", "M", "B"):
+                g[height - 2][x] = "-"
+
+        #clear the top 4 rows
+        for y in range(4):
+            for x in range(width):
+                g[y][x] = "-"
+
+        # rows 4-5 mostly clear
+        for y in range(4, 6):
+            for x in range(1, width - 1):
+                if g[y][x] != "-":
+                    if random.random() < 0.8:
+                        g[y][x] = "-"
+
+        # randomly remove isolated floating single blocks
+        for y in range(4, height - 2):
+            for x in range(1, width - 1):
+                if g[y][x] in ("B", "?", "M", "X"):
+                    left_solid = g[y][x - 1] in ("B", "?", "M", "X")
+                    right_solid = g[y][x + 1] in ("B", "?", "M", "X")
+                    below_solid = g[y + 1][x] in ("B", "?", "M", "X", "|", "T")
+                    if not left_solid and not right_solid and not below_solid:
+                        if random.random() < 0.7:
+                            g[y][x] = "-"
+
+        # M and ? must be reachable (4 spaces)
+        for x in range(1, width - 1):
+            for y in range(4, height - 2):
+                if g[y][x] in ("M", "?"):
+                    has_support = False
+                    for dy in range(1, 5):
+                        if y + dy < height and g[y + dy][x] in ("X", "B", "?", "M"):
+                            has_support = True
+                            break
+                    if not has_support:
+                        g[y][x] = "-"
+
+        # coins must be reachable (2 spaces)
+        for x in range(1, width - 1):
+            for y in range(4, height - 2):
+                if g[y][x] == "o":
+                    has_support = False
+                    for dy in range(1, 3):
+                        if y + dy < height and g[y + dy][x] in ("X", "B", "?", "M"):
+                            has_support = True
+                            break
+                    if not has_support:
+                        g[y][x] = "-"
+
+        # block directly below ?, B, M must be air
+        for x in range(1, width - 1):
+            for y in range(4, height - 2):
+                if g[y][x] in ("?", "B", "M"):
+                    if y + 1 < height - 1 and g[y + 1][x] in ("?", "B", "M", "X"):
+                        g[y + 1][x] = "-"
+
+        # clear starting area
+        for y in range(height - 1):
+            for x in range(1, 5):
+                if g[y][x] not in ("-", "m"):
+                    g[y][x] = "-"
+
+        #clear ending area 
+        for y in range(height - 1):
+            for x in range(width - 5, width - 1):
+                if g[y][x] not in ("-", "f", "v", "X"):
+                    g[y][x] = "-"
+
 
         for x in g:
             x[0] = "-"
