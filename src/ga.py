@@ -158,125 +158,6 @@ class Individual_Grid(object):
                     if fill_y >= 4:
                         genome[fill_y][col] = "X"
 
-        # Constraints
-        # cap gap widths to 4 so they stay jumpable
-        gap_count = 0
-        for x in range(1, width - 1):
-            if genome[height - 1][x] == "-":
-                gap_count += 1
-                if gap_count > 4:
-                    genome[height - 1][x] = "X"
-            else:
-                gap_count = 0
-
-        # clear walls/pipes above gaps
-        for x in range(1, width - 1):
-            if genome[height - 1][x] == "-":
-                for y in range(height - 2, -1, -1):
-                    if genome[y][x] in ("X", "|", "T"):
-                        genome[y][x] = "-"
-
-
-        # fix floating X walls
-        # For each column, find floating X (not connected to ground).
-        # If the floating X wall would be height <= 4 when grounded, fill it to ground; if it can form a staircase with neighboring grounded wall, fill it to ground; otherwise, remove the top X tiles from the floating wall
-        for x in range(1, width - 1):
-            if genome[height - 1][x] != "X":
-                continue  # \gaps already handled
-            # Find grounded wall height
-            grounded_top = height - 1
-            for y in range(height - 2, -1, -1):
-                if genome[y][x] == "X":
-                    grounded_top = y
-                else:
-                    break
-            # find floating X above ground
-            floating_xs = []
-            for y in range(grounded_top - 1, -1, -1):
-                if genome[y][x] == "X":
-                    floating_xs.append(y)
-            if not floating_xs:
-                continue
-            # highest floating X
-            highest_floating = min(floating_xs)
-            # height if fill from highest floating X down to ground
-            total_height = (height - 2) - highest_floating + 1
-            # neighbor wall heights for staircase check
-            can_stair = False
-            for nx in [x - 1, x + 1]:
-                if 0 <= nx < width and genome[height - 1][nx] == "X":
-                    nh = 0
-                    for ny in range(height - 2, -1, -1):
-                        if genome[ny][nx] == "X":
-                            nh += 1
-                        else:
-                            break
-                    if nh > 0 and abs(total_height - nh) <= 2:
-                        can_stair = True
-
-            if total_height <= 4 or can_stair:
-                # Fill from highest floating X down to ground
-                for fill_y in range(highest_floating, height - 1):
-                    genome[fill_y][x] = "X"
-            else:
-                # Remove the floating X
-                for y in floating_xs:
-                    genome[y][x] = "-"
-
-        # break up vertical stacks of B
-        for x in range(1, width - 1):
-            b_count = 0
-            for y in range(height - 2, -1, -1):
-                if genome[y][x] == "B":
-                    b_count += 1
-                    if b_count >= 2:
-                        genome[y][x] = "-"
-                else:
-                    b_count = 0
-
-        # clear top 4 rows
-        for y in range(4):
-            for x in range(width):
-                genome[y][x] = "-"
-
-        # M and ? must be reachable  (4 spaces below must be solid)
-        for x in range(1, width - 1):
-            for y in range(4, height - 2):
-                if genome[y][x] in ("M", "?"):
-                    has_support = False
-                    for dy in range(1, 5):
-                        if y + dy < height and genome[y + dy][x] in ("X", "B", "?", "M"):
-                            has_support = True
-                            break
-                    if not has_support:
-                        genome[y][x] = "-"
-
-        # coins must be reachable (2 spaces below must be solid)
-        for x in range(1, width - 1):
-            for y in range(4, height - 2):
-                if genome[y][x] == "o":
-                    has_support = False
-                    for dy in range(1, 3):
-                        if y + dy < height and genome[y + dy][x] in ("X", "B", "?", "M"):
-                            has_support = True
-                            break
-                    if not has_support:
-                        genome[y][x] = "-"
-
-        # no block directly above a pipe top 
-        for x in range(1, width - 1):
-            for y in range(1, height - 1):
-                if genome[y][x] == "T" and y - 1 >= 0:
-                    if genome[y - 1][x] != "-":
-                        genome[y - 1][x] = "-"        
-
-        # block directly below ?, B, M must be air
-        for x in range(1, width - 1):
-            for y in range(4, height - 2):
-                if genome[y][x] in ("?", "B", "M"):
-                    if y + 1 < height - 1 and genome[y + 1][x] in ("?", "B", "M", "X"):
-                        genome[y + 1][x] = "-"
-
         return genome
 
     # Create zero or more children from self and other
@@ -301,13 +182,127 @@ class Individual_Grid(object):
         new_genome1 = self.mutate(new_genome1)
         new_genome2 = self.mutate(new_genome2)
 
+        # Constraints
         for genome in (new_genome1, new_genome2):
             for x in range(1, width - 1):
                 for y in range(height - 1):
-                    if genome[y][x] == "|":
-                        if (genome[y + 1][x] not in ("|", "X")
-                            or not any(genome[above][x] == "T" for above in range(y))):
+                    # cap gap widths to 4 so they stay jumpable
+                    gap_count = 0
+                    for x in range(1, width - 1):
+                        if genome[height - 1][x] == "-":
+                            gap_count += 1
+                            if gap_count > 4:
+                                genome[height - 1][x] = "X"
+                        else:
+                            gap_count = 0
+
+                    # clear walls/pipes above gaps
+                    for x in range(1, width - 1):
+                        if genome[height - 1][x] == "-":
+                            for y in range(height - 2, -1, -1):
+                                if genome[y][x] in ("X", "|", "T"):
+                                    genome[y][x] = "-"
+
+
+                    # fix floating X walls
+                    # For each column, find floating X (not connected to ground).
+                    # If the floating X wall would be height <= 4 when grounded, fill it to ground; if it can form a staircase with neighboring grounded wall, fill it to ground; otherwise, remove the top X tiles from the floating wall
+                    for x in range(1, width - 1):
+                        if genome[height - 1][x] != "X":
+                            continue  # \gaps already handled
+                        # Find grounded wall height
+                        grounded_top = height - 1
+                        for y in range(height - 2, -1, -1):
+                            if genome[y][x] == "X":
+                                grounded_top = y
+                            else:
+                                break
+                        # find floating X above ground
+                        floating_xs = []
+                        for y in range(grounded_top - 1, -1, -1):
+                            if genome[y][x] == "X":
+                                floating_xs.append(y)
+                        if not floating_xs:
+                            continue
+                        # highest floating X
+                        highest_floating = min(floating_xs)
+                        # height if fill from highest floating X down to ground
+                        total_height = (height - 2) - highest_floating + 1
+                        # neighbor wall heights for staircase check
+                        can_stair = False
+                        for nx in [x - 1, x + 1]:
+                            if 0 <= nx < width and genome[height - 1][nx] == "X":
+                                nh = 0
+                                for ny in range(height - 2, -1, -1):
+                                    if genome[ny][nx] == "X":
+                                        nh += 1
+                                    else:
+                                        break
+                                if nh > 0 and abs(total_height - nh) <= 2:
+                                    can_stair = True
+
+                        if total_height <= 4 or can_stair:
+                            # Fill from highest floating X down to ground
+                            for fill_y in range(highest_floating, height - 1):
+                                genome[fill_y][x] = "X"
+                        else:
+                            # Remove the floating X
+                            for y in floating_xs:
+                                genome[y][x] = "-"
+
+                    # break up vertical stacks of B
+                    for x in range(1, width - 1):
+                        b_count = 0
+                        for y in range(height - 2, -1, -1):
+                            if genome[y][x] == "B":
+                                b_count += 1
+                                if b_count >= 2:
+                                    genome[y][x] = "-"
+                            else:
+                                b_count = 0
+
+                    # clear top 4 rows
+                    for y in range(4):
+                        for x in range(width):
                             genome[y][x] = "-"
+
+                    # M and ? must be reachable  (4 spaces below must be solid)
+                    for x in range(1, width - 1):
+                        for y in range(4, height - 2):
+                            if genome[y][x] in ("M", "?"):
+                                has_support = False
+                                for dy in range(1, 5):
+                                    if y + dy < height and genome[y + dy][x] in ("X", "B", "?", "M"):
+                                        has_support = True
+                                        break
+                                if not has_support:
+                                    genome[y][x] = "-"
+
+                    # coins must be reachable (2 spaces below must be solid)
+                    for x in range(1, width - 1):
+                        for y in range(4, height - 2):
+                            if genome[y][x] == "o":
+                                has_support = False
+                                for dy in range(1, 3):
+                                    if y + dy < height and genome[y + dy][x] in ("X", "B", "?", "M"):
+                                        has_support = True
+                                        break
+                                if not has_support:
+                                    genome[y][x] = "-"
+
+                    # no block directly above a pipe top 
+                    for x in range(1, width - 1):
+                        for y in range(1, height - 1):
+                            if genome[y][x] == "T" and y - 1 >= 0:
+                                if genome[y - 1][x] != "-":
+                                    genome[y - 1][x] = "-"        
+
+                    # block directly below ?, B, M must be air
+                    for x in range(1, width - 1):
+                        for y in range(4, height - 2):
+                            if genome[y][x] in ("?", "B", "M"):
+                                if y + 1 < height - 1 and genome[y + 1][x] in ("?", "B", "M", "X"):
+                                    genome[y + 1][x] = "-"
 
         return (Individual_Grid(new_genome1), Individual_Grid(new_genome2))
 
